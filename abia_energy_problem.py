@@ -1,6 +1,5 @@
 from symbol import power
 from typing import List, Generator, Set
-
 from abia_energia import *
 
 # Problem params
@@ -18,12 +17,12 @@ class Operator():
 
 
 class MoveClient(Operator):
-    def __init__(self, client, power_plant):
+    def __init__(self, client, destination_PwP):
         self.client = client
-        self.power_plant = power_plant
+        self.destination_PwP = destination_PwP
 
     def __repr__(self) -> str:
-        return f"Client {self.client} has been moved to power plant {self.power_plant}"
+        return f"Client {self.client} has been moved to power plant {self.destination_PwP}"
 
 
 class SwapClient(Operator):
@@ -68,8 +67,10 @@ def generate_complex_initial_state():
 
 
 class StateRepresentation():
-    def __init__(self, params: ProblemParameters):
+    def __init__(self, params: ProblemParameters, client_assignation, remaining_energy):
         self.params = params
+        self.client_assignation = client_assignation
+        self.remaining_energy = remaining_energy
 
     def copy(self):
         pass
@@ -93,9 +94,9 @@ class StateRepresentation():
                     continue
 
                 # Podríamos ahorrarnos calcular esto?
-                consum_client1 = client1.consumption2PowerPlant
+                consum_client1 = client1.consumption2PowerPlant()
 
-                consum_client2 = client2.consumption2PowerPlant
+                consum_client2 = client2.consumption2PowerPlant()
 
                 PwP1 = client1.power_plant
                 PwP2 = client2.power_plant
@@ -107,8 +108,23 @@ class StateRepresentation():
                         and PwP2.remaining_energy - consum_client2 + consum_client1 < PwP2.Produccion):
                     yield SwapClient(id_client1, id_client2)
 
-    def apply_actions():
-        pass
+    def apply_actions(self, action: Operator) -> StateRepresentation:
+        new_state = self.copy()
+
+        if isintance(action, MoveClient):
+            client = action.client
+
+            PwP_1 = client.power_plant
+            PwP_2 = action.destination_PwP
+
+            client.power_plant.remaining_energy += client.consumption2PowerPlant()
+            new_state.destination_PwP.remaining_energy -= client.consumption2PowerPlant()
+
+        elif isintance(action, SwapClient):
+            client1 = action.client1
+            client2 = action.client2
+
+        return new_state
 
     def heuristic():
         pass

@@ -169,7 +169,7 @@ class VEnergia(object):
         """
         Retorna la perdida (en tanto por uno) segun la distancia
         entre central y cliente.
-        El parámetro distancia especifica la distancia entre central y cliente.
+        El parámetro distancia especifíca la distancia entre central y cliente.
         """
         i = 0
         while distancia > PERDIDA[i][0]:
