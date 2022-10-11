@@ -17,7 +17,7 @@ class Operator():
     pass
 
 
-class move_client(Operator):
+class MoveClient(Operator):
     def __init__(self, client, power_plant):
         self.client = client
         self.power_plant = power_plant
@@ -26,7 +26,7 @@ class move_client(Operator):
         return f"Client {self.client} has been moved to power plant {self.power_plant}"
 
 
-class swap_client(Operator):
+class SwapClient(Operator):
     def __init__(self, client1, client2):
         self.client1 = client1
         self.client2 = client2
@@ -67,7 +67,7 @@ def generate_complex_initial_state():
     pass
 
 
-class state_representation():
+class StateRepresentation():
     def __init__(self, params: ProblemParameters):
         self.params = params
 
@@ -78,17 +78,17 @@ class state_representation():
         pass
 
     def generate_actions(self) -> Generator[Operator, None, None]:
-        for id_client1, client1 in enumerate(self.clients_vector):
-            for id_power_plant, power_plant in enumerate(self.power_plants_vector):
+        for id_client1, client1 in enumerate(self.params.clients_vector):
+            for id_power_plant, power_plant in enumerate(self.params.power_plants_vector):
 
                 # Podríamos ahorrarnos calcular esto?
                 consum_client = client1.consumption2PowerPlant(power_plant)
 
                 if consum_client < power_plant.remaining_energy:
                     if client1.power_plant is not power_plant:
-                        yield move_client(id_client1, id_power_plant)
+                        yield MoveClient(id_client1, id_power_plant)
 
-            for id_client2, client2 in enumerate(self.clients_vector):
+            for id_client2, client2 in enumerate(self.params.clients_vector):
                 if id_client1 == id_client2:
                     continue
 
@@ -105,7 +105,7 @@ class state_representation():
 
                 if (PwP1.remaining_energy - consum_client1 + consum_client2 < PwP1.Produccion
                         and PwP2.remaining_energy - consum_client2 + consum_client1 < PwP2.Produccion):
-                    yield swap_client(id_client1, id_client2)
+                    yield SwapClient(id_client1, id_client2)
 
     def apply_actions():
         pass
