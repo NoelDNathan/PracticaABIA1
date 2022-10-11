@@ -176,12 +176,6 @@ class VEnergia(object):
             i = i + 1
         return PERDIDA[i][1]
 
-    @staticmethod
-    def distance(obj1, obj2):
-        x = obj1.CoordX - obj2.CoordX
-        y = obj1.CoordY - obj2.CoordY
-        return (x**2 + y ** 2)**(1/2)
-
 
 class Central(object):
     """
@@ -193,7 +187,6 @@ class Central(object):
         self.Produccion = produccion  # Producción en MW
         self.CoordX = cx  # Coordenada x
         self.CoordY = cy  # Coordenada y
-        self.remaining_energy = produccion
 
     def __repr__(self) -> str:
         return f"Central(tipo={self.Tipo}|produccion={self.Produccion}|cx={self.CoordX}|cy={self.CoordY})"
@@ -209,17 +202,10 @@ class Cliente(object):
         self.Consumo = cons  # Consumo demandado
         self.Contrato = cont  # Tipo de contrato
         self.CoordX = cx  # Coordenada x
-        self.CoordY = cy  # Coordenada y
-        self.Central = None
 
     def __repr__(self) -> str:
         return f"Cliente(Tipo={self.Tipo}|Consumo={self.Consumo}|" +\
                f"Contrato={self.Contrato}|CoordX={self.CoordX}|CoordY={self.CoordY})"
-
-    def consumption2PowerPlant(self, power_plant=None) -> int:
-        power_plant = power_plant if power_plant else self.power_plant
-        dist = VEnergia.distance(self, power_plant)
-        return self.Consumo * (1 + VEnergia.loss(dist))
 
 
 """
