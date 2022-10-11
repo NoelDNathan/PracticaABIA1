@@ -59,21 +59,35 @@ class remove_non_guaranteed_client(Operator):
 
 
 def generate_simple_initial_state(params: ProblemParameters):
-    power_plant_vector = params.power_plants_vector.copy()
-    current_power_plant = power_plant_vector.pop()
+    client_power_plant = list()
+    remaining_energies = list()
+
+    ids_power_plants = [id for id in range(len(params.power_plants_vector))]
+
+    id_PwP = ids_power_plants.pop()
+    PwP = params.power_plants_vector[id_PwP]
+    remain = PwP.Produccion
+
     for client in params.clients_vector:
         if client.Contrato == NOGARANTIZADO:
             continue
-        consum = client.consumption2PowerPlant(current_power_plant)
+
+        consum = electry_supplied_to_client(client, PwP)
         while True:
-            remain = current_power_plant.remain_energy
 
             if consum < remain:
-                client.power_plant = current_power_plant
-                current_power_plant.remain_energy -= consum
+                client_power_plant.append(id_PwP)
+                remain -= consum
                 break
 
-            current_power_plant = power_plant_vector.pop()
+            remaining_energies.append(remain)
+            id_PwP = ids_power_plants.pop()
+            PwP = params.power_plants_vector[id_PwP]
+            remain = PwP.Produccion
+
+    for id in ids_power_plants:
+        PwP = params.power_plants_vector[id]
+        remaining_energies.append(PwP.Produccion)
 
 
 def generate_complex_initial_state():
