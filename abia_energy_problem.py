@@ -101,7 +101,7 @@ class StateRepresentation():
         self.remaining_energies = remaining_energies
 
     def copy(self):
-        pass
+        return StateRepresentation(self.params, self.client_power_plant.copy(), self.remaining_energies.copy())
 
     def __repr__(self) -> str:
         pass
@@ -125,25 +125,31 @@ class StateRepresentation():
 
                 id_PwP1 = self.client_power_plant[client1]
                 id_PwP2 = self.client_power_plant[client2]
+
                 if id_PwP1 == id_PwP2:
                     continue
 
+                PwP1 = self.params.power_plants_vector[id_PwP1]
+                PwP2 = self.params.power_plants_vector[id_PwP2]
+
                 # Podríamos ahorrarnos calcular esto?
                 consum_client1 = electry_supplied_to_client(
-                    client1, power_plant)
+                    client1, PwP1)
 
                 consum_client2 = electry_supplied_to_client(
-                    client2, power_plant)
+                    client2, PwP2)
 
-                remaining_energy1 = self.remaining_energies[id_PwP1]
-                remaining_energy2 = self.remaining_energies[id_PwP2]
+                remain1 = self.remaining_energies[id_PwP1]
+                remain2 = self.remaining_energies[id_PwP2]
 
-                prod1 = self.params.power_plants_vector[id_PwP1]
-                prod2 = self.params.power_plants_vector[id_PwP2]
+                prod1 = PwP1.Produccion
+                prod2 = PwP2.Produccion
 
-                if (remaining_energy1 - consum_client1 + consum_client2 < prod1
-                        and remaining_energy2 - consum_client2 + consum_client1 < prod2):
+                if (remain1 - consum_client1 + consum_client2 < prod1 and remain2 - consum_client2 + consum_client1 < prod2):
                     yield SwapClient(id_client1, id_client2)
+
+    def generate_one_action():
+        combinations_actions = set()
 
     def apply_actions(self, action: Operator) -> StateRepresentation:
         new_state = self.copy()
