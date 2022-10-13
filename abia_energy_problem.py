@@ -1,4 +1,3 @@
-from symbol import power
 from typing import List, Generator, Set
 from abia_energia import *
 
@@ -169,4 +168,5 @@ class StateRepresentation():
         return new_state
 
     def heuristic():
+        # HOLA
         pass
