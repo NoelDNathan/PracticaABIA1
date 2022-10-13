@@ -142,14 +142,65 @@ class StateRepresentation():
                 remain1 = self.remaining_energies[id_PwP1]
                 remain2 = self.remaining_energies[id_PwP2]
 
-                prod1 = PwP1.Produccion
-                prod2 = PwP2.Produccion
-
-                if (remain1 - consum_client1 + consum_client2 < prod1 and remain2 - consum_client2 + consum_client1 < prod2):
+                if (consum_client2 - consum_client1 < remain1 and consum_client1 - consum_client1 < remain2):
                     yield SwapClient(id_client1, id_client2)
 
-    def generate_one_action():
-        combinations_actions = set()
+    def generate_one_action(self):
+        move_client_combinations = set()
+
+        for id_client1, client1 in enumerate(self.params.clients_vector):
+            for id_power_plant, power_plant in enumerate(self.params.power_plants_vector):
+                if self.client_power_plant[id_client1] == id_power_plant:
+                    continue
+
+                # Podríamos ahorrarnos calcular esto?
+                consum_client = electry_supplied_to_client(
+                    client1, power_plant)
+
+                if consum_client < self.remaining_energies[id_power_plant]:
+                    move_client_combinations.add(
+                        MoveClient(id_client1, id_power_plant))
+
+            swap_client_combinations = set()
+
+            for id_client2, client2 in enumerate(self.params.clients_vector):
+                if id_client1 == id_client2:
+                    continue
+
+                id_PwP1 = self.client_power_plant[client1]
+                id_PwP2 = self.client_power_plant[client2]
+
+                if id_PwP1 == id_PwP2:
+                    continue
+
+                PwP1 = self.params.power_plants_vector[id_PwP1]
+                PwP2 = self.params.power_plants_vector[id_PwP2]
+
+                # Podríamos ahorrarnos calcular esto?
+                consum_client1 = electry_supplied_to_client(
+                    client1, PwP1)
+
+                consum_client2 = electry_supplied_to_client(
+                    client2, PwP2)
+
+                remain1 = self.remaining_energies[id_PwP1]
+                remain2 = self.remaining_energies[id_PwP2]
+
+                if (consum_client2 - consum_client1 < remain1 and consum_client1 - consum_client1 < remain2):
+                    swap_client_combinations.add(
+                        SwapClient(id_client1, id_client2))
+
+                n = len(move_client_combinations)
+                m = len(swap_client_combinations)
+
+                random_value = random.random()
+
+                if random_value < (n / (n + m)):
+                    combination = random.choice(list(move_client_combinations))
+                    yield MoveClient(combination[0], combination[1], combination[2])
+                else:
+                    combination = random.choice(list(swap_client_combinations))
+                    yield SwapClient(combination[0], combination[1])
 
     def apply_actions(self, action: Operator) -> StateRepresentation:
         new_state = self.copy()
