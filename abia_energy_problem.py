@@ -10,20 +10,21 @@ def distance(obj1, obj2):
     return (x**2 + y ** 2)**(1/2)
 
 
-def electry_supplied_to_client(client: Cliente, power_plant: Central) -> int:
+def electry_supplied_to_client(client: Cliente, power_plant: Central) -> float:
     dist = distance(client, power_plant)
     return client.Consumo * (1 + VEnergia.loss(dist))
     # return client.Consumo / (1 - VEnergia.loss(dist))
 
-# Problem params
 
+# Problem params
 
 class ProblemParameters(object):
     def __init__(self, clients_vector: Clientes, power_plants_vector: Centrales) -> None:
         self.clients_vector = clients_vector
         self.power_plants_vector = power_plants_vector
-# Operators
 
+
+# Operators
 
 class Operator(object):
     pass
@@ -38,7 +39,7 @@ class MoveClient(Operator):
         return f"Client {self.client} has been moved to power plant {self.destination_PwP}"
 
 
-class SwapClient(Operator):
+class SwapClients(Operator):
     def __init__(self, client1, client2):
         self.client1 = client1
         self.client2 = client2
@@ -53,6 +54,7 @@ class RemoveNGClient(Operator):
 
     def __repr__(self) -> str:
         pass
+
 
 # Generators initial states
 
@@ -93,7 +95,7 @@ def generate_complex_initial_state():
     pass
 
 
-class StateRepresentation():
+class StateRepresentation(object):
     def __init__(self, params: ProblemParameters, client_power_plant: List[int], remaining_energies: List[float]):
         self.params = params
         self.client_power_plant = client_power_plant
@@ -132,11 +134,9 @@ class StateRepresentation():
                 PwP2 = self.params.power_plants_vector[id_PwP2]
 
                 # Podríamos ahorrarnos calcular esto?
-                consum_client1 = electry_supplied_to_client(
-                    client1, PwP1)
+                consum_client1 = electry_supplied_to_client(client1, PwP1)
 
-                consum_client2 = electry_supplied_to_client(
-                    client2, PwP2)
+                consum_client2 = electry_supplied_to_client(client2, PwP2)
 
                 remain1 = self.remaining_energies[id_PwP1]
                 remain2 = self.remaining_energies[id_PwP2]
@@ -144,26 +144,53 @@ class StateRepresentation():
                 prod1 = PwP1.Produccion
                 prod2 = PwP2.Produccion
 
-                if (remain1 - consum_client1 + consum_client2 < prod1 and remain2 - consum_client2 + consum_client1 < prod2):
-                    yield SwapClient(id_client1, id_client2)
+                if remain1 - consum_client1 + consum_client2 < prod1 and remain2 - consum_client2 + consum_client1 < prod2:
+                    yield SwapClients(id_client1, id_client2)
 
         return
 
-    def apply_actions(self, action: Operator) -> StateRepresentation:
+    def apply_action(self, action: Operator) -> StateRepresentation:
         new_state = self.copy()
 
         if isinstance(action, MoveClient):
-            client = action.client
+            id = action.client
+            new_state.client_power_plant[id] = action.destination_PwP
 
-            PwP_1 = client.power_plant
+            PwP_1 = self.client_power_plant[id]
             PwP_2 = action.destination_PwP
 
-            client.power_plant.remaining_energy += client.consumption2PowerPlant()
-            new_state.destination_PwP.remaining_energy -= client.consumption2PowerPlant()
+            # Instancia cliente
+            instancia_cliente = self.params.clients_vector[id]
+            # Instancias centrales
+            instancia_central1 = self.params.power_plants_vector[PwP_1]
+            instancia_central2 = self.params.power_plants_vector[PwP_2]
 
-        elif isinstance(action, SwapClient):
-            client1 = action.client1
-            client2 = action.client2
+            new_state.remaining_energies[PwP_1] += electry_supplied_to_client(client=instancia_cliente, power_plant=instancia_central1)
+            new_state.remaining_energies[PwP_2] -= electry_supplied_to_client(client=instancia_cliente, power_plant=instancia_central2)
+
+        elif isinstance(action, SwapClients):
+            id_client1 = action.client1
+            id_client2 = action.client2
+
+            PwP_1 = self.client_power_plant[id_client1]
+            PwP_2 = self.client_power_plant[id_client2]
+
+            new_state.client_power_plant[id_client1] = PwP_2
+            new_state.client_power_plant[id_client2] = PwP_1
+
+            # Instancias clientes
+            instancia_cliente1 = self.params.clients_vector[id_client1]
+            instancia_cliente2 = self.params.clients_vector[id_client2]
+            # Instancias centrales
+            instancia_central1 = self.params.power_plants_vector[PwP_1]
+            instancia_central2 = self.params.power_plants_vector[PwP_2]
+
+            new_state.remaining_energies[PwP_1] = new_state.remaining_energies[PwP_1] + \
+                                                  electry_supplied_to_client(client=instancia_cliente1, power_plant=instancia_central1) - \
+                                                  electry_supplied_to_client(client=instancia_cliente2, power_plant=instancia_central1)
+            new_state.remaining_energies[PwP_2] = new_state.remaining_energies[PwP_2] + \
+                                                  electry_supplied_to_client(client=instancia_cliente2, power_plant=instancia_central2) - \
+                                                  electry_supplied_to_client(client=instancia_cliente1, power_plant=instancia_central2)
 
         return new_state
 
