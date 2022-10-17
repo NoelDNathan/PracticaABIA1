@@ -1,5 +1,6 @@
 from typing import List, Generator, Set
 from abia_energia import *
+from search import Problem, hill_climbing
 
 
 # Our Methods
@@ -9,11 +10,11 @@ def distance(obj1, obj2):
     y = obj1.CoordY - obj2.CoordY
     return (x**2 + y ** 2)**(1/2)
 
-
 def electry_supplied_to_client(client: Cliente, power_plant: Central) -> float:
     dist = distance(client, power_plant)
     return client.Consumo * (1 + VEnergia.loss(dist))
     # return client.Consumo / (1 - VEnergia.loss(dist))
+
 
 
 # Problem params
@@ -24,7 +25,8 @@ class ProblemParameters(object):
         self.power_plants_vector = power_plants_vector
 
     def __repr__(self):
-        return f"Params(clients_vector=\n{self.clients_vector}\n\npower_plants_vector=\n{self.power_plants_vector})"
+        return f"clients_vector={self.clients_vector}\n\npower_plants_vector={self.power_plants_vector})"
+
 
 
 # Operators
@@ -39,7 +41,7 @@ class MoveClient(Operator):
         self.id_destination_PwP = id_destination_PwP
 
     def __repr__(self) -> str:
-        return f"Client {self.client} has been moved to power plant {self.destination_PwP}"
+        return f"Client {self.id_client} has been moved to power plant {self.id_destination_PwP}"
 
 
 class SwapClients(Operator):
@@ -48,7 +50,7 @@ class SwapClients(Operator):
         self.id_client2 = id_client2
 
     def __repr__(self) -> str:
-        return f"Swap between Client {self.client1} and Client {self.client2}"
+        return f"Swap between Client {self.id_client1} and Client {self.id_client2}"
 
 
 class RemoveNGClient(Operator):
@@ -57,6 +59,7 @@ class RemoveNGClient(Operator):
 
     def __repr__(self) -> str:
         pass
+
 
 
 # Generators initial states
@@ -102,6 +105,7 @@ def generate_complex_initial_state():
     pass
 
 
+
 # State Representation
 
 class StateRepresentation(object):
@@ -109,14 +113,13 @@ class StateRepresentation(object):
         self.params = params
         self.client_power_plant = client_power_plant
         self.remaining_energies = remaining_energies
-        self.real_consm = real_consumption
+        self.real_consumption = real_consumption
 
     def copy(self):
-        return StateRepresentation(self.params, self.client_power_plant.copy(), self.remaining_energies.copy())
+        return StateRepresentation(self.params, self.client_power_plant.copy(), self.remaining_energies.copy(), self.real_consumption.copy())
 
     def __repr__(self) -> str:
-        return f"Problem Parameters: \n\n{self.params} \n\nclient_power_plant: {self.client_power_plant} \
-                \n\nremaining_energies: {self.remaining_energies} \n\nreal_consumption: {self.real_consumption}"
+        return f"client_power_plant: {self.client_power_plant}"
 
     def generate_actions(self) -> Generator[Operator, None, None]:
         for id_client1 in range(len(self.params.clients_vector)):
@@ -124,7 +127,7 @@ class StateRepresentation(object):
                 if self.client_power_plant[id_client1] == id_PwP:
                     continue
 
-                csm_client = self.real_consm[id_PwP][id_client1]
+                csm_client = self.real_consumption[id_PwP][id_client1]
 
                 if csm_client < self.remaining_energies[id_PwP]:
                     yield MoveClient(id_client1, id_PwP)
@@ -142,11 +145,11 @@ class StateRepresentation(object):
                 if id_PwP1 == -1 or id_PwP2 == -1:
                     continue
 
-                csm_pwp1_cli1 = self.real_consm[id_PwP1][id_client1]
-                csm_pwp2_cli1 = self.real_consm[id_PwP2][id_client1]
+                csm_pwp1_cli1 = self.real_consumption[id_PwP1][id_client1]
+                csm_pwp2_cli1 = self.real_consumption[id_PwP2][id_client1]
 
-                csm_pwp1_cli2 = self.real_consm[id_PwP1][id_client2]
-                csm_pwp2_cli2 = self.real_consm[id_PwP2][id_client2]
+                csm_pwp1_cli2 = self.real_consumption[id_PwP1][id_client2]
+                csm_pwp2_cli2 = self.real_consumption[id_PwP2][id_client2]
 
                 remain1 = self.remaining_energies[id_PwP1]
                 remain2 = self.remaining_energies[id_PwP2]
@@ -164,24 +167,22 @@ class StateRepresentation(object):
             new_state.client_power_plant[id_client] = id_PwP2 = action.id_destination_PwP
 
             if id_PwP1 != -1:
-                new_state.remaining_energies[id_PwP1] += self.real_consm[id_PwP1][id_client]
+                new_state.remaining_energies[id_PwP1] += self.real_consumption[id_PwP1][id_client]
 
-            new_state.remaining_energies[id_PwP2] -= self.real_consm[id_PwP2][id_client]
+            new_state.remaining_energies[id_PwP2] -= self.real_consumption[id_PwP2][id_client]
 
         elif isinstance(action, SwapClients):
             id_client1 = action.id_client1
             id_client2 = action.id_client2
 
-            PwP1 = self.client_power_plant[id_client1]
-            PwP2 = self.client_power_plant[id_client2]
+            id_PwP1 = self.client_power_plant[id_client1]
+            id_PwP2 = self.client_power_plant[id_client2]
 
-            new_state.client_power_plant[id_client1] = PwP2
-            new_state.client_power_plant[id_client2] = PwP1
+            new_state.client_power_plant[id_client1] = id_PwP2
+            new_state.client_power_plant[id_client2] = id_PwP1
 
-            new_state.remaining_energies[PwP1] += self.real_consm[PwP1][id_client1] - \
-                self.real_consm[PwP1][id_client2]
-            new_state.remaining_energies[PwP2] += self.real_consm[PwP2][id_client2] - \
-                self.real_consm[PwP2][id_client1]
+            new_state.remaining_energies[id_PwP1] += self.real_consumption[id_PwP1][id_client1] - self.real_consumption[id_PwP1][id_client2]
+            new_state.remaining_energies[id_PwP2] += self.real_consumption[id_PwP2][id_client2] - self.real_consumption[id_PwP2][id_client1]
 
         return new_state
 
@@ -211,6 +212,7 @@ class StateRepresentation(object):
         return gain
 
 
+
 # Clase del problema
 
 class EnergyProblem(Problem):
@@ -221,7 +223,7 @@ class EnergyProblem(Problem):
         return state.generate_actions()
 
     def result(self, state: StateRepresentation, action: Operator) -> StateRepresentation:
-        return state.apply_action(action)
+        return state.apply_actions(action)
 
     def value(self, state: StateRepresentation) -> float:
         return state.heuristic()
@@ -230,11 +232,12 @@ class EnergyProblem(Problem):
         return False
 
 
+
 # Ejecución del programa.
-clientes = Clientes(ncl=10, propc=[0.4, 0.3, 0.3], propg=1, seed=44)
-centrales = Centrales(centrales_por_tipo=[0, 1, 0], seed=44)
-parametros = ProblemParameters(
-    clients_vector=clientes, power_plants_vector=centrales)
+
+clientes = Clientes(ncl=1000, propc=[0.4, 0.3, 0.3], propg=1, seed=44)
+centrales = Centrales(centrales_por_tipo=[20, 10, 10], seed=44)
+parametros = ProblemParameters(clients_vector=clientes, power_plants_vector=centrales)
 estado_inicial = generate_simple_initial_state(params=parametros)
 
 print(hill_climbing(EnergyProblem(estado_inicial)))
