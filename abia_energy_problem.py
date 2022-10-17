@@ -225,15 +225,31 @@ class StateRepresentation(object):
 
 
 
+# Clase del problema
+
+class EnergyProblem(Problem):
+    def __init__(self, initial_state: StateRepresentation):
+        super().__init__(initial_state)
+        
+    def actions(self, state: StateRepresentation) -> Generator[Operator,None,None]:
+        return state.generate_actions()
+    
+    def result(self, state: StateRepresentation, action: Operator) -> StateRepresentation:
+        return state.apply_action(action)
+    
+    def value(self, state: StateRepresentation) -> float:
+        return state.heuristic()
+        
+    def goal_test(self, state: StateRepresentation) -> bool:
+        return False
+        
+
+
 # Ejecución del programa.
 
 clientes = Clientes(ncl=10, propc=[0.4, 0.3, 0.3], propg=1, seed=44)
 centrales = Centrales(centrales_por_tipo=[0, 1, 0], seed=44)
 parametros = ProblemParameters(clients_vector=clientes, power_plants_vector=centrales)
-estado = generate_simple_initial_state(params=parametros)
+estado_inicial = generate_simple_initial_state(params=parametros)
 
-print(estado)
-
-print(list(estado.generate_actions()))
-
-print(estado.heuristic())
+print(hill_climbing(EnergyProblem(estado_inicial)))
