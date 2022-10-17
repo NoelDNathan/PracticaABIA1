@@ -202,6 +202,7 @@ class Cliente(object):
         self.Consumo = cons  # Consumo demandado
         self.Contrato = cont  # Tipo de contrato
         self.CoordX = cx  # Coordenada x
+        self.CoordY = cy
 
     def __repr__(self) -> str:
         return f"Cliente(Tipo={self.Tipo}|Consumo={self.Consumo}|" +\
