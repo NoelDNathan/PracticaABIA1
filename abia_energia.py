@@ -189,24 +189,23 @@ class Central(object):
         self.CoordY = cy  # Coordenada y
 
     def __repr__(self) -> str:
-        return f"Central(tipo={self.Tipo}|produccion={self.Produccion}|cx={self.CoordX}|cy={self.CoordY})"
+        return f"[Tipo={self.Tipo}|Produccion={self.Produccion}|cx={self.CoordX}|cy={self.CoordY}]"
 
 
 class Cliente(object):
     """
     Características del cliente
     """
-
+    
     def __init__(self, t: int, cons: float, cont: int, cx: int, cy: int):
         self.Tipo = t  # Tipo del cliente
         self.Consumo = cons  # Consumo demandado
         self.Contrato = cont  # Tipo de contrato
         self.CoordX = cx  # Coordenada x
-        self.CoordY = cy
+        self.CoordY = cy  # Coordenada y
 
     def __repr__(self) -> str:
-        return f"Cliente(Tipo={self.Tipo}|Consumo={self.Consumo}|" +\
-               f"Contrato={self.Contrato}|CoordX={self.CoordX}|CoordY={self.CoordY})"
+        return f"[Tipo={self.Tipo}|Consumo={self.Consumo}|Contrato={self.Contrato}|CoordX={self.CoordX}|CoordY={self.CoordY}]"
 
 
 """
