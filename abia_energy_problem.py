@@ -85,6 +85,28 @@ def generate_state_vars(params: ProblemParameters):
     return remaining_energies, real_consumption
 
 
+def calculate_gains(params, remaining_energies, client_power_plant):
+    gain = 0
+
+    for id_central, central in enumerate(params.power_plants_vector):
+        if central.Produccion == remaining_energies[id_central]:
+            gain -= VEnergia.stop_cost(central.Tipo)
+        else:
+            gain -= VEnergia.costs_production_mw(central.Tipo) * central.Produccion + VEnergia.daily_cost(central.Tipo)
+
+    for id_client, client in enumerate(params.clients_vector):
+        if client_power_plant[id_client] == -1:
+            gain -= VEnergia.tarifa_cliente_penalizacion(client.Tipo) * client.Consumo
+            continue
+
+        if client.Contrato == 0:
+            gain += VEnergia.tarifa_cliente_garantizada(client.Tipo) * client.Consumo
+        else:
+            gain += VEnergia.tarifa_cliente_no_garantizada(client.Tipo) * client.Consumo
+
+    return gain
+
+
 def generate_simple_initial_state(params: ProblemParameters):
     remaining_energies, real_consumption = generate_state_vars(params)
     client_power_plant = list()
@@ -107,7 +129,11 @@ def generate_simple_initial_state(params: ProblemParameters):
 
             id_PwP = ids_power_plants.pop()
 
-    return StateRepresentation(params, np.array(client_power_plant), remaining_energies, real_consumption)
+    client_power_plant = np.array(client_power_plant)
+
+    gain = calculate_gains(params, remaining_energies, client_power_plant)
+
+    return StateRepresentation(params, client_power_plant, remaining_energies, real_consumption, gain)
 
 
 def generate_complex_initial_state(params: ProblemParameters):
@@ -117,20 +143,23 @@ def generate_complex_initial_state(params: ProblemParameters):
 # State Representation
 
 class StateRepresentation(object):
-    def __init__(self, params: ProblemParameters, client_power_plant: List[int], remaining_energies: List[float], real_consumption: List[List[float]]):
+    def __init__(self, params: ProblemParameters, client_power_plant: List[int], remaining_energies: List[float], real_consumption: List[List[float]], gain: float):
         self.params = params
         self.client_power_plant = client_power_plant
         self.remaining_energies = remaining_energies
         self.real_consumption = real_consumption
+        self.gain = gain
 
     def copy(self):
-        return StateRepresentation(self.params, np.array(self.client_power_plant, copy=True), np.array(self.remaining_energies), self.real_consumption)
+        return StateRepresentation(self.params, np.array(self.client_power_plant, copy=True), np.array(self.remaining_energies), self.real_consumption, self.gain)
 
     def __repr__(self) -> str:
         return f"client_power_plant: {self.client_power_plant}"
 
     def generate_actions(self) -> Generator[Operator, None, None]:
-        for id_client1 in range(len(self.params.clients_vector)):
+        for id_client1 in range(len(self.params.clients_vector) - 1):
+
+            # MoveClient
             for id_PwP in range(len(self.params.power_plants_vector)):
                 if self.client_power_plant[id_client1] == id_PwP:
                     continue
@@ -140,10 +169,8 @@ class StateRepresentation(object):
                 if csm_client < self.remaining_energies[id_PwP]:
                     yield MoveClient(id_client1, id_PwP)
 
-            for id_client2 in range(id_client1, len(self.params.clients_vector)):
-                if id_client1 == id_client2:
-                    continue
-
+            # SwapClients
+            for id_client2 in range(id_client1 + 1, len(self.params.clients_vector)):
                 id_PwP1 = self.client_power_plant[id_client1]
                 id_PwP2 = self.client_power_plant[id_client2]
 
@@ -165,8 +192,9 @@ class StateRepresentation(object):
                 if (csm_pwp1_cli2 - csm_pwp1_cli1 < remain1 and csm_pwp2_cli1 - csm_pwp2_cli2 < remain2):
                     yield SwapClients(id_client1, id_client2)
 
-            if self.params.clients_vector[id_client1].Tipo == NOGARANTIZADO:
-                yield RemoveNGClient(id_client1)
+            # Remove client
+            # if self.params.clients_vector[id_client1].Tipo == NOGARANTIZADO:
+            #     yield RemoveNGClient(id_client1)
 
 
     def apply_actions(self, action: Operator):  # -> StateRepresentation:
@@ -174,12 +202,36 @@ class StateRepresentation(object):
 
         if isinstance(action, MoveClient):
             id_client = action.id_client
+            client = self.params.clients_vector[id_client]
+
             id_PwP1 = self.client_power_plant[id_client]
+            PwP1 = self.params.power_plants_vector[id_PwP1]
+
             id_PwP2 = action.id_destination_PwP
+            PwP2 = self.params.power_plants_vector[id_PwP2]
+
             new_state.client_power_plant[id_client] = id_PwP2
 
             if id_PwP1 != -1:
                 new_state.remaining_energies[id_PwP1] += self.real_consumption[id_PwP1][id_client]
+
+                # La central pasa a estar apagada (sumar el coste de tenerla encendida y restar el de que este apagada).
+                # Solo puede pasar si el cliente estaba asignado a alguna central.
+                if new_state.remaining_energies[id_PwP1] == PwP1.Produccion:
+                    self.gain += VEnergia.costs_production_mw(PwP1.Tipo) * PwP1.Produccion + VEnergia.daily_cost(PwP1.Tipo) \
+                               - VEnergia.stop_cost(PwP1.Tipo)
+            
+            # Si el cliente no estaba asignado a ninguna central, hay que tener en cuenta su coste.
+            else:
+                if client.Contrato == 0:
+                    self.gain += VEnergia.tarifa_cliente_garantizada(client.Tipo) * client.Consumo
+                else:
+                    self.gain += VEnergia.tarifa_cliente_no_garantizada(client.Tipo) * client.Consumo
+
+            # Si la central a la que se mueve estaba apagada (sumar el coste de tenerla apagada y restar el de tenerla encendida).
+            if new_state.remaining_energies[id_PwP2] == PwP2.Produccion:
+                self.gain -= VEnergia.costs_production_mw(PwP2.Tipo) * PwP2.Produccion + VEnergia.daily_cost(PwP2.Tipo) \
+                           + VEnergia.stop_cost(PwP2.Tipo)
 
             new_state.remaining_energies[id_PwP2] -= self.real_consumption[id_PwP2][id_client]
 
@@ -198,38 +250,22 @@ class StateRepresentation(object):
             new_state.remaining_energies[id_PwP2] += self.real_consumption[id_PwP2][id_client2] - \
                 self.real_consumption[id_PwP2][id_client1]
 
-        elif isinstance(action, RemoveNGClient):
-            id_client = action.id_client
+        # elif isinstance(action, RemoveNGClient):
+        #     id_client = action.id_client
 
-            new_state.client_power_plant[id_client] = -1
+        #     new_state.client_power_plant[id_client] = -1
 
-            id_PwP = self.client_power_plant[id_client]
+        #     id_PwP = self.client_power_plant[id_client]
 
-            new_state.remaining_energies[id_PwP] += self.real_consumption[id_PwP][id_client]
+        #     new_state.remaining_energies[id_PwP] += self.real_consumption[id_PwP][id_client]
 
         return new_state
 
-    def heuristic(self) -> float:
-        gain = 0
-
-        for id_central, central in enumerate(self.params.power_plants_vector):
-            if central.Produccion == self.remaining_energies[id_central]:
-                gain -= VEnergia.stop_cost(central.Tipo)
-            else:
-                gain -= VEnergia.costs_production_mw(
-                    central.Tipo) * central.Produccion + VEnergia.daily_cost(central.Tipo)
-
-        for id_client, client in enumerate(self.params.clients_vector):
-            if self.client_power_plant[id_client] == -1:
-                gain -= VEnergia.tarifa_cliente_penalizacion(client.Tipo) * client.Consumo
-                continue
-
-            if client.Contrato == 0:
-                gain += VEnergia.tarifa_cliente_garantizada(client.Tipo) * client.Consumo
-            else:
-                gain += VEnergia.tarifa_cliente_no_garantizada(client.Tipo) * client.Consumo
-
-        return gain
+    def better_heuristic(self) -> float:
+        return self.gain
+        
+    def bad_heuristic(self) -> float:
+        return calculate_gains(self.params, self.remaining_energies, self.client_power_plant)
 
     def heuristic_simple_entropy(self) -> float:
         entropy = 0
@@ -256,7 +292,7 @@ class EnergyProblem(Problem):
         return state.apply_actions(action)
 
     def value(self, state: StateRepresentation) -> float:
-        return state.heuristic()
+        return state.better_heuristic()
 
     def goal_test(self, state: StateRepresentation) -> bool:
         return False
@@ -274,12 +310,11 @@ estado_inicial = generate_simple_initial_state(params=parametros)
 # estado_inicial = generate_simple_initial_state(params=parametros)
 
 print(estado_inicial)
-print(estado_inicial.heuristic())
+print(estado_inicial.better_heuristic())
 print()
-
 
 start = time.time()
 ejecucion = hill_climbing(EnergyProblem(estado_inicial))
 print(time.time() - start)
 print(ejecucion)
-print(ejecucion.heuristic())
+print(ejecucion.better_heuristic())
