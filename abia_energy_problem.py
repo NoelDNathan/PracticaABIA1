@@ -6,7 +6,6 @@ import numpy as np
 import time
 
 
-
 # Our Methods
 
 def distance(obj1, obj2):
@@ -57,11 +56,11 @@ class SwapClients(Operator):
 
 
 class RemoveNGClient(Operator):
-    def __init__(self, p_i: int, p_j: int):
-        pass
+    def __init__(self, id_client: int):
+        self.id_client = id_client
 
     def __repr__(self) -> str:
-        pass
+        return f"Client {self.id_client} has been removed"
 
 
 # Generators initial states
@@ -83,7 +82,7 @@ def generate_state_vars(params: ProblemParameters):
 
     remaining_energies = np.array(remaining_energies)
     real_consumption = np.array(real_consumption)
-    return (remaining_energies, real_consumption)
+    return remaining_energies, real_consumption
 
 
 def generate_simple_initial_state(params: ProblemParameters):
@@ -141,7 +140,7 @@ class StateRepresentation(object):
                 if csm_client < self.remaining_energies[id_PwP]:
                     yield MoveClient(id_client1, id_PwP)
 
-            for id_client2 in range(len(self.params.clients_vector)):
+            for id_client2 in range(id_client1, len(self.params.clients_vector)):
                 if id_client1 == id_client2:
                     continue
 
@@ -165,6 +164,10 @@ class StateRepresentation(object):
 
                 if (csm_pwp1_cli2 - csm_pwp1_cli1 < remain1 and csm_pwp2_cli1 - csm_pwp2_cli2 < remain2):
                     yield SwapClients(id_client1, id_client2)
+
+            if self.params.clients_vector[id_client1].Tipo == NOGARANTIZADO:
+                yield RemoveNGClient(id_client1)
+
 
     def apply_actions(self, action: Operator):  # -> StateRepresentation:
         new_state = self.copy()
@@ -195,6 +198,15 @@ class StateRepresentation(object):
             new_state.remaining_energies[id_PwP2] += self.real_consumption[id_PwP2][id_client2] - \
                 self.real_consumption[id_PwP2][id_client1]
 
+        elif isinstance(action, RemoveNGClient):
+            id_client = action.id_client
+
+            new_state.client_power_plant[id_client] = -1
+
+            id_PwP = self.client_power_plant[id_client]
+
+            new_state.remaining_energies[id_PwP] += self.real_consumption[id_PwP][id_client]
+
         return new_state
 
     def heuristic(self) -> float:
@@ -209,16 +221,13 @@ class StateRepresentation(object):
 
         for id_client, client in enumerate(self.params.clients_vector):
             if self.client_power_plant[id_client] == -1:
-                gain -= VEnergia.tarifa_cliente_penalizacion(
-                    client.Tipo) * client.Consumo
+                gain -= VEnergia.tarifa_cliente_penalizacion(client.Tipo) * client.Consumo
                 continue
 
             if client.Contrato == 0:
-                gain += VEnergia.tarifa_cliente_garantizada(
-                    client.Tipo) * client.Consumo
+                gain += VEnergia.tarifa_cliente_garantizada(client.Tipo) * client.Consumo
             else:
-                gain += VEnergia.tarifa_cliente_no_garantizada(
-                    client.Tipo) * client.Consumo
+                gain += VEnergia.tarifa_cliente_no_garantizada(client.Tipo) * client.Consumo
 
         return gain
 
@@ -231,6 +240,7 @@ class StateRepresentation(object):
             occupancy = 1 - (max_prod - remain / max_prod)
             entropy -= occupancy * math.log(occupancy)
         return entropy
+
 
 # Clase del problema
 
@@ -253,11 +263,15 @@ class EnergyProblem(Problem):
 
 
 # Ejecución del programa.
-clientes = Clientes(ncl=1000, propc=[0.4, 0.3, 0.3], propg=1, seed=44)
+clientes = Clientes(ncl=100, propc=[0.4, 0.3, 0.3], propg=1, seed=44)
 centrales = Centrales(centrales_por_tipo=[20, 10, 10], seed=44)
-parametros = ProblemParameters(
-    clients_vector=clientes, power_plants_vector=centrales)
+parametros = ProblemParameters(clients_vector=clientes, power_plants_vector=centrales)
 estado_inicial = generate_simple_initial_state(params=parametros)
+
+# clientes = Clientes(ncl=1000, propc=[0.25, 0.3, 0.45], propg=0.75, seed=1234)
+# centrales = Centrales(centrales_por_tipo=[5, 10, 25], seed=1234)
+# parametros = ProblemParameters(clients_vector=clientes, power_plants_vector=centrales)
+# estado_inicial = generate_simple_initial_state(params=parametros)
 
 print(estado_inicial)
 print(estado_inicial.heuristic())
