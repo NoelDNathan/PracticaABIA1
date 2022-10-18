@@ -1,20 +1,22 @@
 from typing import List, Generator, Set
 from abia_energia import *
 from search import Problem, hill_climbing
-
+import math
+import numpy as np
 
 # Our Methods
+
 
 def distance(obj1, obj2):
     x = obj1.CoordX - obj2.CoordX
     y = obj1.CoordY - obj2.CoordY
     return (x**2 + y ** 2)**(1/2)
 
+
 def electry_supplied_to_client(client: Cliente, power_plant: Central) -> float:
     dist = distance(client, power_plant)
     return client.Consumo * (1 + VEnergia.loss(dist))
     # return client.Consumo / (1 - VEnergia.loss(dist))
-
 
 
 # Problem params
@@ -26,7 +28,6 @@ class ProblemParameters(object):
 
     def __repr__(self):
         return f"clients_vector={self.clients_vector}\n\npower_plants_vector={self.power_plants_vector})"
-
 
 
 # Operators
@@ -61,19 +62,15 @@ class RemoveNGClient(Operator):
         pass
 
 
-
 # Generators initial states
 
 # -> StateRepresentation:
-def generate_simple_initial_state(params: ProblemParameters):
+
+def generate_state_vars(params: ProblemParameters):
     remaining_energies = list()
     real_consumption = list()
-    client_power_plant = list()
 
-    ids_power_plants = list()
-
-    for id_PwP, power_plant in enumerate(params.power_plants_vector):
-        ids_power_plants.append(id_PwP)
+    for power_plant in params.power_plants_vector:
         remaining_energies.append(power_plant.Produccion)
         row = list()
 
@@ -81,6 +78,17 @@ def generate_simple_initial_state(params: ProblemParameters):
             consumtion = electry_supplied_to_client(client, power_plant)
             row.append(consumtion)
         real_consumption.append(row)
+
+    remaining_energies = np.array(remaining_energies)
+    real_consumption = np.array(real_consumption)
+    return (remaining_energies, real_consumption)
+
+
+def generate_simple_initial_state(params: ProblemParameters):
+    remaining_energies, real_consumption = generate_state_vars(params)
+    client_power_plant = list()
+
+    ids_power_plants = list(range(len(params.power_plants_vector)))
 
     id_PwP = ids_power_plants.pop()
 
@@ -98,12 +106,11 @@ def generate_simple_initial_state(params: ProblemParameters):
 
             id_PwP = ids_power_plants.pop()
 
-    return StateRepresentation(params, client_power_plant, remaining_energies, real_consumption)
+    return StateRepresentation(params, np.arange(client_power_plant), remaining_energies, real_consumption)
 
 
-def generate_complex_initial_state():
-    pass
-
+def generate_complex_initial_state(params: ProblemParameters):
+    remaining_energies, real_consumption = generate_state_vars(params)
 
 
 # State Representation
@@ -116,7 +123,7 @@ class StateRepresentation(object):
         self.real_consumption = real_consumption
 
     def copy(self):
-        return StateRepresentation(self.params, self.client_power_plant.copy(), self.remaining_energies.copy(), self.real_consumption.copy())
+        return StateRepresentation(self.params, np.array(self.client_power_plant, copy=True), np.array(self.remaining_energies), self.real_consumption)
 
     def __repr__(self) -> str:
         return f"client_power_plant: {self.client_power_plant}"
@@ -164,7 +171,7 @@ class StateRepresentation(object):
             id_client = action.id_client
             id_PwP1 = self.client_power_plant[id_client]
             id_PwP2 = action.id_destination_PwP
-            new_state.client_power_plant[id_client] = id_PwP2 = action.id_destination_PwP
+            new_state.client_power_plant[id_client] = id_PwP2
 
             if id_PwP1 != -1:
                 new_state.remaining_energies[id_PwP1] += self.real_consumption[id_PwP1][id_client]
@@ -181,8 +188,10 @@ class StateRepresentation(object):
             new_state.client_power_plant[id_client1] = id_PwP2
             new_state.client_power_plant[id_client2] = id_PwP1
 
-            new_state.remaining_energies[id_PwP1] += self.real_consumption[id_PwP1][id_client1] - self.real_consumption[id_PwP1][id_client2]
-            new_state.remaining_energies[id_PwP2] += self.real_consumption[id_PwP2][id_client2] - self.real_consumption[id_PwP2][id_client1]
+            new_state.remaining_energies[id_PwP1] += self.real_consumption[id_PwP1][id_client1] - \
+                self.real_consumption[id_PwP1][id_client2]
+            new_state.remaining_energies[id_PwP2] += self.real_consumption[id_PwP2][id_client2] - \
+                self.real_consumption[id_PwP2][id_client1]
 
         return new_state
 
@@ -211,9 +220,18 @@ class StateRepresentation(object):
 
         return gain
 
+    def heuristic_simple_entropy(self) -> float:
+        entropy = 0
+        for id_central, power_plant in enumerate(self.params.power_plants_vector):
+            remain = self.remaining_energies[id_central]
+            max_prod = power_plant.Produccion
 
+            occupancy = 1 - (max_prod - remain / max_prod)
+            entropy -= occupancy * math.log(occupancy)
+        return entropy
 
 # Clase del problema
+
 
 class EnergyProblem(Problem):
     def __init__(self, initial_state: StateRepresentation):
@@ -232,12 +250,11 @@ class EnergyProblem(Problem):
         return False
 
 
-
 # Ejecución del programa.
-
 clientes = Clientes(ncl=1000, propc=[0.4, 0.3, 0.3], propg=1, seed=44)
 centrales = Centrales(centrales_por_tipo=[20, 10, 10], seed=44)
-parametros = ProblemParameters(clients_vector=clientes, power_plants_vector=centrales)
+parametros = ProblemParameters(
+    clients_vector=clientes, power_plants_vector=centrales)
 estado_inicial = generate_simple_initial_state(params=parametros)
 
 print(hill_climbing(EnergyProblem(estado_inicial)))
