@@ -3,9 +3,11 @@ from abia_energia import *
 from search import Problem, hill_climbing
 import math
 import numpy as np
+import time
+
+
 
 # Our Methods
-
 
 def distance(obj1, obj2):
     x = obj1.CoordX - obj2.CoordX
@@ -106,7 +108,7 @@ def generate_simple_initial_state(params: ProblemParameters):
 
             id_PwP = ids_power_plants.pop()
 
-    return StateRepresentation(params, np.arange(client_power_plant), remaining_energies, real_consumption)
+    return StateRepresentation(params, np.array(client_power_plant), remaining_energies, real_consumption)
 
 
 def generate_complex_initial_state(params: ProblemParameters):
@@ -257,4 +259,13 @@ parametros = ProblemParameters(
     clients_vector=clientes, power_plants_vector=centrales)
 estado_inicial = generate_simple_initial_state(params=parametros)
 
-print(hill_climbing(EnergyProblem(estado_inicial)))
+print(estado_inicial)
+print(estado_inicial.heuristic())
+print()
+
+
+start = time.time()
+ejecucion = hill_climbing(EnergyProblem(estado_inicial))
+print(time.time() - start)
+print(ejecucion)
+print(ejecucion.heuristic())
