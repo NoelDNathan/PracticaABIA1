@@ -1,6 +1,5 @@
 import random
 from math import trunc
-from tkinter import Y
 from typing import List
 
 """
@@ -196,7 +195,7 @@ class Cliente(object):
     """
     Características del cliente
     """
-    
+
     def __init__(self, t: int, cons: float, cont: int, cx: int, cy: int):
         self.Tipo = t  # Tipo del cliente
         self.Consumo = cons  # Consumo demandado
