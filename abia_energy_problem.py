@@ -100,16 +100,13 @@ def calculate_gains(params, remaining_energies, client_power_plant):
 
     for id_client, client in enumerate(params.clients_vector):
         if client_power_plant[id_client] == -1:
-            gain -= VEnergia.tarifa_cliente_penalizacion(
-                client.Tipo) * client.Consumo
+            gain -= VEnergia.tarifa_cliente_penalizacion(client.Tipo) * client.Consumo
             continue
 
         if client.Contrato == 0:
-            gain += VEnergia.tarifa_cliente_garantizada(
-                client.Tipo) * client.Consumo
+            gain += VEnergia.tarifa_cliente_garantizada(client.Tipo) * client.Consumo
         else:
-            gain += VEnergia.tarifa_cliente_no_garantizada(
-                client.Tipo) * client.Consumo
+            gain += VEnergia.tarifa_cliente_no_garantizada(client.Tipo) * client.Consumo
 
     return gain
 
@@ -248,7 +245,7 @@ class StateRepresentation(object):
                     remain1 = self.remaining_energies[id_PwP1]
                     remain2 = self.remaining_energies[id_PwP2]
 
-                    if (csm_pwp1_cli2 - csm_pwp1_cli1 < remain1 and csm_pwp2_cli1 - csm_pwp2_cli2 < remain2):
+                    if csm_pwp1_cli2 - csm_pwp1_cli1 < remain1 and csm_pwp2_cli1 - csm_pwp2_cli2 < remain2:
                         yield SwapClients(id_client1, id_client2)
 
             # Remove client
@@ -281,12 +278,7 @@ class StateRepresentation(object):
 
             # Si el cliente no estaba asignado a ninguna central, hay que tener en cuenta su coste.
             else:
-                if client.Contrato == 0:
-                    new_state.gain += VEnergia.tarifa_cliente_garantizada(
-                        client.Tipo) * client.Consumo
-                else:
-                    new_state.gain += VEnergia.tarifa_cliente_no_garantizada(
-                        client.Tipo) * client.Consumo
+                new_state.gain += VEnergia.tarifa_cliente_penalizacion(client.Tipo) * client.Consumo
 
             # Si la central a la que se mueve estaba apagada (sumar el coste de tenerla apagada y restar el de tenerla encendida).
             if new_state.remaining_energies[id_PwP2] == PwP2.Produccion:
@@ -415,22 +407,36 @@ class EnergyProblem(Problem):
 
 
 # Ejecución del programa.
-clientes = Clientes(ncl=100, propc=[0.4, 0.3, 0.3], propg=1, seed=44)
-centrales = Centrales(centrales_por_tipo=[20, 10, 10], seed=44)
-parametros = ProblemParameters(clients_vector=clientes, power_plants_vector=centrales)
-estado_inicial = generate_simple_initial_state2(params=parametros, worst=False)
-
-# clientes = Clientes(ncl=1000, propc=[0.25, 0.3, 0.45], propg=0.75, seed=1234)
-# centrales = Centrales(centrales_por_tipo=[5, 10, 25], seed=1234)
+# clientes = Clientes(ncl=100, propc=[0.4, 0.3, 0.3], propg=1, seed=44)
+# centrales = Centrales(centrales_por_tipo=[20, 10, 10], seed=44)
 # parametros = ProblemParameters(clients_vector=clientes, power_plants_vector=centrales)
-# estado_inicial = generate_simple_initial_state(params=parametros)
+# estado_inicial = generate_simple_initial_state2(params=parametros, worst=False)
+
+clientes = Clientes(ncl=1000, propc=[0.25, 0.3, 0.45], propg=0.75, seed=1234)
+centrales = Centrales(centrales_por_tipo=[5, 10, 25], seed=1234)
+parametros = ProblemParameters(clients_vector=clientes, power_plants_vector=centrales)
+estado_inicial = generate_simple_initial_state(params=parametros)
 
 print(estado_inicial)
 print(estado_inicial.better_heuristic())
 print()
+
+n = estado_inicial.client_power_plant
+a = 0
+for x in n:
+    if x == -1:
+        a += 1
+print(a)
 
 start = time.time()
 ejecucion = hill_climbing(EnergyProblem(estado_inicial))
 print(time.time() - start)
 print(ejecucion)
 print(ejecucion.better_heuristic())
+
+m = ejecucion.client_power_plant
+b = 0
+for x in m:
+    if x == -1:
+        b += 1
+print(b)
