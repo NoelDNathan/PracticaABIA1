@@ -255,7 +255,7 @@ class StateRepresentation(object):
             # if self.params.clients_vector[id_client1].Tipo == NOGARANTIZADO:
             #     yield RemoveNGClient(id_client1)
 
-    def apply_actions(self, action: Operator):  # -> StateRepresentation:
+    def apply_action(self, action: Operator):  # -> StateRepresentation:
         new_state = self.copy()
 
         if isinstance(action, MoveClient):
@@ -276,21 +276,21 @@ class StateRepresentation(object):
                 # La central pasa a estar apagada (sumar el coste de tenerla encendida y restar el de que este apagada).
                 # Solo puede pasar si el cliente estaba asignado a alguna central.
                 if new_state.remaining_energies[id_PwP1] == PwP1.Produccion:
-                    self.gain += VEnergia.costs_production_mw(PwP1.Tipo) * PwP1.Produccion + VEnergia.daily_cost(PwP1.Tipo) \
+                    new_state.gain += VEnergia.costs_production_mw(PwP1.Tipo) * PwP1.Produccion + VEnergia.daily_cost(PwP1.Tipo) \
                         - VEnergia.stop_cost(PwP1.Tipo)
 
             # Si el cliente no estaba asignado a ninguna central, hay que tener en cuenta su coste.
             else:
                 if client.Contrato == 0:
-                    self.gain += VEnergia.tarifa_cliente_garantizada(
+                    new_state.gain += VEnergia.tarifa_cliente_garantizada(
                         client.Tipo) * client.Consumo
                 else:
-                    self.gain += VEnergia.tarifa_cliente_no_garantizada(
+                    new_state.gain += VEnergia.tarifa_cliente_no_garantizada(
                         client.Tipo) * client.Consumo
 
             # Si la central a la que se mueve estaba apagada (sumar el coste de tenerla apagada y restar el de tenerla encendida).
             if new_state.remaining_energies[id_PwP2] == PwP2.Produccion:
-                self.gain -= VEnergia.costs_production_mw(PwP2.Tipo) * PwP2.Produccion + VEnergia.daily_cost(PwP2.Tipo) \
+                new_state.gain -= VEnergia.costs_production_mw(PwP2.Tipo) * PwP2.Produccion + VEnergia.daily_cost(PwP2.Tipo) \
                     + VEnergia.stop_cost(PwP2.Tipo)
 
             new_state.remaining_energies[id_PwP2] -= self.real_consumption[id_PwP2][id_client]
@@ -321,7 +321,7 @@ class StateRepresentation(object):
 
         return new_state
 
-    def apply_actions_without_copy(self, action: Operator):
+    def apply_action_without_copy(self, action: Operator):
 
         if isinstance(action, MoveClient):
             id_client = action.id_client
@@ -405,7 +405,7 @@ class EnergyProblem(Problem):
         return state.generate_actions()
 
     def result(self, state: StateRepresentation, action: Operator) -> StateRepresentation:
-        return state.apply_actions(action)
+        return state.apply_action(action)
 
     def value(self, state: StateRepresentation) -> float:
         return state.better_heuristic()
