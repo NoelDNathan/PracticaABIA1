@@ -116,7 +116,7 @@ def calculate_gains(params, remaining_energies, client_power_plant):
 
 def generate_simple_initial_state(params: ProblemParameters):
     remaining_energies, real_consumption = generate_state_vars(params)
-    print(remaining_energies)
+    # print(remaining_energies)
     client_power_plant = list()
 
     ids_power_plants = list(range(len(params.power_plants_vector)))
@@ -129,8 +129,8 @@ def generate_simple_initial_state(params: ProblemParameters):
             continue
 
         consum = real_consumption[id_PwP][id_client]
-        print(consum)
-        print(remaining_energies[0])
+        # print(consum)
+        # print(remaining_energies[0])
         while True:
             if consum < remaining_energies[id_PwP]:
                 client_power_plant.append(id_PwP)
@@ -417,8 +417,7 @@ class EnergyProblem(Problem):
 # Ejecución del programa.
 clientes = Clientes(ncl=100, propc=[0.4, 0.3, 0.3], propg=1, seed=44)
 centrales = Centrales(centrales_por_tipo=[20, 10, 10], seed=44)
-parametros = ProblemParameters(
-    clients_vector=clientes, power_plants_vector=centrales)
+parametros = ProblemParameters(clients_vector=clientes, power_plants_vector=centrales)
 estado_inicial = generate_simple_initial_state2(params=parametros, worst=False)
 
 # clientes = Clientes(ncl=1000, propc=[0.25, 0.3, 0.45], propg=0.75, seed=1234)
