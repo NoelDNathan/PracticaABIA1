@@ -4,7 +4,7 @@ from search import Problem
 
 class EnergyProblem(Problem):
     def __init__(self, initial_state: StateRepresentation, used_actions: List[int], used_heuristic: int):
-        self.used_actions   = used_actions
+        self.used_actions = used_actions
         self.used_heuristic = used_heuristic
         super().__init__(initial_state)
 
@@ -20,6 +20,9 @@ class EnergyProblem(Problem):
 
         if self.used_heuristic == ENTROPY_HEURISTIC:
             return state.entropy_heuristic()
+
+        if self.used_heuristic == COMBINED_HEURISTIC:
+            return state.combined_heuristic()
 
     def goal_test(self, state: StateRepresentation) -> bool:
         return False
