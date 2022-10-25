@@ -414,9 +414,60 @@ class StateRepresentation(object):
                         if remaining_bigger > consumed:
                             yield MergePwPs(smaller, bigger, consumed)
 
-            # Remove client
-            # if self.params.clients_vector[id_client1].Tipo == NOGARANTIZADO:
-            #     yield RemoveNGClient(id_client1)
+    def generate_one_action(self) -> Generator[Operator, None, None]:
+        move_client_combinations = set()
+        swap_client_combinations = set()
+
+        numClients = len(self.params.clients_vector)
+        numCentrals = len(self.params.power_plants_vector)
+
+        for id_client1 in range(numClients):
+
+            # MoveClient
+            for id_PwP in range(numCentrals):
+                if self.client_power_plant[id_client1] == id_PwP:
+                    continue
+
+                csm_client = self.real_consumption[id_PwP][id_client1]
+
+                if csm_client < self.remaining_energies[id_PwP]:
+                    move_client_combinations.add((id_client1, id_PwP))
+
+            # SwapClients
+            if id_client1 != numClients - 1:
+
+                for id_client2 in range(id_client1 + 1, numClients):
+                    id_PwP1 = self.client_power_plant[id_client1]
+                    id_PwP2 = self.client_power_plant[id_client2]
+
+                    if id_PwP1 == id_PwP2:
+                        continue
+
+                    if id_PwP1 == -1 or id_PwP2 == -1:
+                        continue
+
+                    csm_pwp1_cli1 = self.real_consumption[id_PwP1][id_client1]
+                    csm_pwp2_cli1 = self.real_consumption[id_PwP2][id_client1]
+
+                    csm_pwp1_cli2 = self.real_consumption[id_PwP1][id_client2]
+                    csm_pwp2_cli2 = self.real_consumption[id_PwP2][id_client2]
+
+                    remain1 = self.remaining_energies[id_PwP1]
+                    remain2 = self.remaining_energies[id_PwP2]
+
+                    if csm_pwp1_cli2 - csm_pwp1_cli1 < remain1 and csm_pwp2_cli1 - csm_pwp2_cli2 < remain2:
+                        swap_client_combinations.add((id_client1, id_client2))
+
+        n = len(move_client_combinations)
+        m = len(swap_client_combinations)
+        random_value = random.random()
+        if random_value < (n / (n + m)):
+            combination = random.choice(list(move_client_combinations))
+            yield MoveClient(combination[0], combination[1])
+
+        else:
+            combination = random.choice(list(swap_client_combinations))
+            yield SwapClients(combination[0], combination[1])
 
     def apply_action(self, action: Operator):  # -> StateRepresentation:
         new_state = self.copy()
