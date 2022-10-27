@@ -24,5 +24,8 @@ class EnergyProblem(Problem):
         if self.used_heuristic == COMBINED_HEURISTIC:
             return state.combined_heuristic()
 
+        if self.used_heuristic == FIX_STATE_HEURISTIC:
+            return state.fix_state_heuristic()
+
     def goal_test(self, state: StateRepresentation) -> bool:
         return False

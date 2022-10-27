@@ -19,20 +19,33 @@ class InitialState(object):
         remain, consum = InitialState.remain_consum(params)
         n = len(params.clients_vector)
         c_pp = [NONPOWERPLANT for _ in range(n)]
-        gain, prices = InitialState.calculate_gain(params, c_pp, remain)
-        return StateRepresentation(params, c_pp, remain, consum, gain, prices)
+        gain, prices = InitialState.calculate_gain(
+            params, c_pp, remain,  are_clients_assigned=False)
+
+        c_guaranteed = filter(
+            lambda client: client[1].Contrato == GARANTIZADO, enumerate(params.clients_vector))
+
+        misplaced_clients = sum(
+            map(lambda client: c_pp[client[0]] == NONPOWERPLANT, c_guaranteed))
+
+        return StateRepresentation(params, c_pp, remain, consum, gain, prices, misplaced_clients=misplaced_clients)
 
     @staticmethod
-    def simple_state(params, asc=True) -> StateRepresentation:
+    def simple_state(params, asc=True, sort_clients=False) -> StateRepresentation:
         remain, consum = InitialState.remain_consum(params)
-
         c_pp = []
         pp = list(range(len(params.power_plants_vector)))
         if asc:
             pp.reverse()
 
         id_pp = pp.pop()
-        for id_client, client in enumerate(params.clients_vector):
+        clients = enumerate(params.clients_vector)
+        if sort_clients:
+            clients = sorted(enumerate(params.clients_vector),
+                             key=lambda x: x[1].Consumo, reverse=True)
+
+        for id_client, client in clients:
+            cycles = 0
             if client.Contrato == NOGARANTIZADO:
                 c_pp.append(NONPOWERPLANT)
                 continue
@@ -44,8 +57,14 @@ class InitialState(object):
                     remain[id_pp] -= c_consum
                     break
                 id_pp = pp.pop()
-
                 if len(pp) == 0:
+                    cycles += 1
+                    if cycles >= 2:
+                        print(remain)
+                        print(c_consum)
+                        assert(False, "Deberia fallar aqui")
+                        print("Not enough power plants to generate initial state")
+                        exit()
                     pp = list(range(len(params.power_plants_vector)))
                     if asc:
                         pp.reverse()
@@ -53,6 +72,7 @@ class InitialState(object):
         c_pp = np.array(c_pp)
 
         gain, prices = InitialState.calculate_gain(params, c_pp, remain)
+
         return StateRepresentation(params, c_pp, remain, consum, gain, prices)
 
     @staticmethod
@@ -73,7 +93,7 @@ class InitialState(object):
         return remain, consum
 
     @staticmethod
-    def calculate_gain(params, c_pp, remain) -> float:
+    def calculate_gain(params, c_pp, remain, all_pp_turned_on=False, are_clients_assigned=True) -> float:
         gain = 0
         prices = [[], [], []]
 
@@ -82,14 +102,16 @@ class InitialState(object):
             prices[1].append(VEnergia.daily_cost(
                 pp.Tipo) + VEnergia.costs_production_mw(pp.Tipo) * pp.Produccion)
 
-            if pp.Produccion == remain[id_pp]:
+            if all_pp_turned_on or pp.Produccion == remain[id_pp]:
                 gain -= prices[0][id_pp]
             else:
                 gain -= prices[1][id_pp]
 
         for id_c, c in enumerate(params.clients_vector):
-            if c.Contrato == 0:
-                gain += c.Consumo * VEnergia.tarifa_cliente_garantizada(c.Tipo)
+            if c.Contrato == GARANTIZADO:
+                if are_clients_assigned:
+                    gain += c.Consumo * \
+                        VEnergia.tarifa_cliente_garantizada(c.Tipo)
             else:
                 gain += c.Consumo * \
                     VEnergia.tarifa_cliente_no_garantizada(c.Tipo)
