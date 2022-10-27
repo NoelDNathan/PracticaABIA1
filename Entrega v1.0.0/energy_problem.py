@@ -3,13 +3,17 @@ from search import Problem
 
 
 class EnergyProblem(Problem):
-    def __init__(self, initial_state: StateRepresentation, used_actions: List[int], used_heuristic: int):
+    def __init__(self, initial_state: StateRepresentation, used_actions: List[int], used_heuristic: int, use_one_action: bool = False):
         self.used_actions = used_actions
         self.used_heuristic = used_heuristic
+        self.use_one_action = use_one_action
         super().__init__(initial_state)
 
     def actions(self, state: StateRepresentation) -> Generator[Operator, None, None]:
-        return state.generate_actions(self.used_actions)
+        if self.use_one_action:
+            return state.generate_one_action(self.used_actions)
+        else: 
+            return state.generate_actions(self.used_actions)
 
     def result(self, state: StateRepresentation, action: Operator) -> StateRepresentation:
         return state.apply_action(action)

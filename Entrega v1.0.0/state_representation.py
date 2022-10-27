@@ -52,12 +52,15 @@ class StateRepresentation(object):
                                    self.misplaced_clients
                                    )
 
-    def __repr__(self) -> str:
+    def served_clients(self) -> int:
         s_c = 0
         for i in self.c_pp:
             if i != NONPOWERPLANT:
                 s_c += 1
-        return f"Served clients = {s_c} of {len(self.c_pp)} \nGains: {self.gain_heuristic()} \n"
+        return s_c
+
+    def __repr__(self) -> str:
+        return f"Served clients = {self.served_clients()} of {len(self.c_pp)} \nGains: {self.gain_heuristic()} \n"
 
     def generate_actions(self, used_actions) -> Generator[Operator, None, None]:
         num_c = len(self.params.clients_vector)
@@ -118,9 +121,10 @@ class StateRepresentation(object):
                     if c_consum < self.remain[id_pp]:
                         yield SuperMoveClient(id_c, id_pp)
 
-    def generate_one_action(self) -> Generator[Operator, None, None]:
+    def generate_one_action(self, used_actions) -> Generator[Operator, None, None]:
         move_client_combinations = set()
         swap_client_combinations = set()
+        super_move_client_combinations = set()
 
         numClients = len(self.params.clients_vector)
         numCentrals = len(self.params.power_plants_vector)
@@ -128,50 +132,33 @@ class StateRepresentation(object):
         for id_client1 in range(numClients):
 
             # MoveClient
-            for id_PwP in range(numCentrals):
-                if self.c_pp[id_client1] == id_PwP:
-                    continue
-
-                csm_client = self.consum[id_PwP][id_client1]
-
-                if csm_client < self.remain[id_PwP]:
-                    move_client_combinations.add((id_client1, id_PwP))
-
-            # SwapClients
-            if id_client1 != numClients - 1:
-
-                for id_client2 in range(id_client1 + 1, numClients):
-                    id_PwP1 = self.c_pp[id_client1]
-                    id_PwP2 = self.c_pp[id_client2]
-
-                    if id_PwP1 == id_PwP2:
+            if MOVE_CLIENT in used_actions:
+                for id_PwP in range(numCentrals):
+                    if self.c_pp[id_client1] == id_PwP:
                         continue
 
-                    if id_PwP1 == -1 or id_PwP2 == -1:
-                        continue
+                    csm_client = self.consum[id_PwP][id_client1]
 
-                    csm_pwp1_cli1 = self.consum[id_PwP1][id_client1]
-                    csm_pwp2_cli1 = self.consum[id_PwP2][id_client1]
+                    if csm_client < self.remain[id_PwP]:
+                        move_client_combinations.add((id_client1, id_PwP))
 
-                    csm_pwp1_cli2 = self.consum[id_PwP1][id_client2]
-                    csm_pwp2_cli2 = self.consum[id_PwP2][id_client2]
+            # Super Move Client
+            if SUPER_MOVE_CLIENT in used_actions:
+                for id_c in range(numClients):
+                    for id_pp in range(numCentrals):
+                        if id_pp == self.c_pp[id_c]:
+                            continue
 
-                    remain1 = self.remain[id_PwP1]
-                    remain2 = self.remain[id_PwP2]
+                        c_consum = self.consum[id_pp][id_c]
+                        if c_consum < self.remain[id_pp]:
+                            super_move_client_combinations.add((id_c, id_pp))
 
-                    if csm_pwp1_cli2 - csm_pwp1_cli1 < remain1 and csm_pwp2_cli1 - csm_pwp2_cli2 < remain2:
-                        swap_client_combinations.add((id_client1, id_client2))
-
-        n = len(move_client_combinations)
-        m = len(swap_client_combinations)
-        random_value = random.random()
-        if random_value < (n / (n + m)):
+        if MOVE_CLIENT in used_actions:
             combination = random.choice(list(move_client_combinations))
-            yield MoveClient(combination[0], combination[1])
-
-        else:
-            combination = random.choice(list(swap_client_combinations))
-            yield SwapClients(combination[0], combination[1])
+            yield MoveClient(combination[0], combination[1])  
+        elif SUPER_MOVE_CLIENT in used_actions:  
+            combination = random.choice(list(super_move_client_combinations))
+            yield SuperMoveClient(combination[0], combination[1])
 
     def apply_action(self, action: Operator):
         new_state = self.copy()
@@ -256,6 +243,5 @@ class StateRepresentation(object):
         return self.gain_heuristic() + self.entropy_heuristic()
 
     def fix_state_heuristic(self) -> float:
-        k = 6250
-
+        k = 7000
         return -self.misplaced_clients * k + self.gain_heuristic()
