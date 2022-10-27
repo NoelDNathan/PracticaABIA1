@@ -15,3 +15,6 @@ git clone 'https://github.com/NoelDNathan/PracticaABIA1'
 ```
 
 ## Créditos
+* [**Huilin Ni**](https://github.com/HuilinNi15)
+* [**Victor Gesiarz**](https://github.com/VictorGesiarz)
+* [**Noel Nathan Planell Bosch**](https://github.com/NoelDNathan)
