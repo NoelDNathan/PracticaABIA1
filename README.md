@@ -9,7 +9,7 @@
 ## Descripción del proyecto 
 Esta es una implementación de los algoritmos de HillClimbing y SimulatedAnnealing para un problema propuesto en el que se asignan centrales productoras de electricidad a diferentes clientes con diferentes consumos. El objetivo es encontrar la solución más óptima tanto en tiempo de ejecución y beneficios del estado final. 
 
-## Instalación y ejecución del proyecto
+## Instalación del proyecto
 ```bash
 git clone 'https://github.com/NoelDNathan/PracticaABIA1' 
 ```
